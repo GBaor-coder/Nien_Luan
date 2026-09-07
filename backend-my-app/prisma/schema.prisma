@@ -1,0 +1,474 @@
+// ============================================================
+// DATABASE SCHEMA - HỆ THỐNG THƯ VIỆN TRƯỜNG HỌC
+// Phiên bản: 2.0
+// Database: MySQL (Prisma ORM)
+// ============================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================
+// 1. QUẢN LÝ NGƯỜI DÙNG & PHÂN QUYỀN
+// ============================================================
+
+model Role {
+  id          String   @id @default(cuid())
+   name        String   @unique // admin, teacher, student
+  description String?
+  permissions String   @default("[]") // JSON array of permissions
+  level       Int      @default(0) // Priority level: admin(100) > librarian(80) > teacher(50) > student(10)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  users User[]
+}
+
+model User {
+  id          String    @id @default(cuid())
+  code        String    @unique // Ma NV: GV001, HV001
+  name        String
+  email       String    @unique
+  password    String
+  phone       String?
+  avatar      String?
+  gender      String?   // male, female, other
+  dateOfBirth DateTime?
+  status      String    @default("active") // active, inactive, locked
+  lastActive  DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  roleId      String
+  role        Role      @relation(fields: [roleId], references: [id])
+
+  teacher     Teacher?
+  student     Student?
+  librarian   Librarian?
+  notifications Notification[]
+  auditLogs   AuditLog[]
+  reviews     Review[]
+  sessions    Session[]
+}
+
+// ============================================================
+// 2. QUẢN LÝ HỌC SINH & GIÁO VIÊN
+// ============================================================
+
+model Student {
+  id          String    @id @default(cuid())
+  studentId   String    @unique // Ma hoc sinh: HS2024001
+  className   String    // Lop: 10A1, 11B2
+  grade       Int       // Khoi: 10, 11, 12
+  enrollYear  Int       // Nam nhap hoc
+  status      String    @default("active") // active, graduated, transferred
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  userId      String    @unique
+  user        User      @relation(fields: [userId], references: [id])
+
+  borrowRecords BorrowRecord[]
+  reservations  Reservation[]
+  fines         Fine[]
+  membershipCard MembershipCard?
+}
+
+model Teacher {
+  id          String    @id @default(cuid())
+  teacherId   String    @unique // Ma giao vien: GV2024001
+  department  String    // Khoa/Bo mon: Toan, Van, Anh...
+  position    String?   // Chuc vu: Giao vien, To truong...
+  degree      String?   // Bang cap: Cu nhan, Thac si, Tien si
+  status      String    @default("active")
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  userId      String    @unique
+  user        User      @relation(fields: [userId], references: [id])
+
+  borrowRecords BorrowRecord[]
+  reservations  Reservation[]
+  fines         Fine[]
+  membershipCard MembershipCard?
+}
+
+model Librarian {
+  id            String    @id @default(cuid())
+  employeeId    String    @unique // Ma thu thu: TT2024001
+  department    String?   // Phong ban
+  position      String?   // Chuc vu: Thu thu truong, Thu thu
+  startDate     DateTime  @default(now())
+  status        String    @default("active")
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  userId        String    @unique
+  user          User      @relation(fields: [userId], references: [id])
+
+  borrowRecords BorrowRecord[]
+}
+
+// ============================================================
+// 3. QUẢN LÝ SÁCH
+// ============================================================
+
+model Category {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  description String?
+  color       String   @default("#2563EB")
+  icon        String?  // Icon name for UI
+  parentId    String?  // Ho tro phan cap
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  parent      Category?  @relation("CategoryTree", fields: [parentId], references: [id])
+  children    Category[] @relation("CategoryTree")
+  books       Book[]
+}
+
+model Author {
+  id          String   @id @default(cuid())
+  name        String
+  nationality String?
+  bio         String?
+  avatar      String?
+  birthYear   Int?
+  deathYear   Int?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  books       Book[]
+}
+
+model Publisher {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  address     String?
+  phone       String?
+  email       String?
+  website     String?
+  description String?
+  foundedYear Int?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  books       Book[]
+}
+
+model Book {
+  id          String   @id @default(cuid())
+  title       String
+  isbn        String?  @unique
+  year        Int?
+  pages       Int?
+  language    String   @default("Vietnamese")
+  price       Float?
+  location    String?  // Vi tri ke: A1-02-05
+  description String?
+  coverImage  String?
+  coverColor  String   @default("#2563EB")
+  edition     String?
+  quantity    Int      @default(1)
+  available   Int      @default(1)
+  status      String   @default("available") // available, limited, unavailable
+  avgRating   Float    @default(0)
+  totalReviews Int     @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  categoryId  String?
+  category    Category?  @relation(fields: [categoryId], references: [id])
+  authorId    String?
+  author      Author?    @relation(fields: [authorId], references: [id])
+  publisherId String?
+  publisher   Publisher? @relation(fields: [publisherId], references: [id])
+
+  copies        BookCopy[]
+  borrowRecords BorrowRecord[]
+  reservations  Reservation[]
+  reviews       Review[]
+  bookTags      BookTag[]
+  bookStats     BookStats[]
+}
+
+model BookCopy {
+  id            String   @id @default(cuid())
+  barcode       String   @unique // Ma vach: LIB-2024-000001
+  condition     String   @default("good") // new, good, fair, poor, damaged
+  shelfLocation String?  // Vi tri tren ke
+  status        String   @default("available") // available, borrowed, reserved, lost, damaged
+  acquiredDate  DateTime @default(now())
+  lastChecked   DateTime? // Kiem ke lan cuoi
+  notes         String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  bookId String
+  book   Book   @relation(fields: [bookId], references: [id])
+
+  borrowRecords BorrowRecord[]
+  reservations  Reservation[]
+}
+
+// ============================================================
+// 4. QUẢN LÝ MUON/TRA
+// ============================================================
+
+model BorrowRecord {
+  id            String    @id @default(cuid())
+  borrowDate    DateTime  @default(now())
+  dueDate       DateTime
+  returnDate    DateTime?
+  status        String    @default("active") // active, returned, overdue, lost
+  renewalCount  Int       @default(0) // So lan gia han
+  maxRenewals   Int       @default(2) // So lan gia han toi da
+  notes         String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  readerId      String
+  readerType    String    // student, teacher
+  studentId     String?
+  student       Student?  @relation(fields: [studentId], references: [id])
+  teacherId     String?
+  teacher       Teacher?  @relation(fields: [teacherId], references: [id])
+
+  bookCopyId    String
+  bookCopy      BookCopy  @relation(fields: [bookCopyId], references: [id])
+  bookId        String
+  book          Book      @relation(fields: [bookId], references: [id])
+
+  reservationId String?   @unique // Phiếu mượn tạo từ đặt chỗ
+  reservation   Reservation? @relation(fields: [reservationId], references: [id])
+
+  borrowedBy    String?   // Librarian who processed
+  librarianId   String?
+  librarian     Librarian? @relation(fields: [librarianId], references: [id])
+
+  returnedBy    String?   // Librarian who received return
+  returnLibId   String?
+
+  fines         Fine[]
+}
+
+model Reservation {
+  id                    String   @id @default(cuid())
+  requestDate           DateTime @default(now())
+  estimatedAvailability DateTime?
+  expiryDate            DateTime @default(now()) // Het han dat cho
+  queuePosition         Int      @default(0)
+  status                String   @default("in_queue") // in_queue, ready, fulfilled, cancelled, expired
+  notes                 String?
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  readerId      String
+  readerType    String    // student, teacher
+  studentId     String?
+  student       Student?  @relation(fields: [studentId], references: [id])
+  teacherId     String?
+  teacher       Teacher?  @relation(fields: [teacherId], references: [id])
+
+  bookId        String
+  book          Book      @relation(fields: [bookId], references: [id])
+
+  bookCopyId    String?
+  bookCopy      BookCopy?  @relation(fields: [bookCopyId], references: [id]) // Bản sách giao cho đặt chỗ
+
+  borrowRecord  BorrowRecord? // Phiếu mượn tạo từ đặt chỗ
+}
+
+// ============================================================
+// 5. QUẢN LÝ PHAT
+// ============================================================
+
+model Fine {
+  id          String   @id @default(cuid())
+  amount      Float
+  reason      String   // overdue, damaged, lost
+  status      String   @default("pending") // pending, paid, waived, partially_paid
+  paidAmount  Float    @default(0)
+  paidDate    DateTime?
+  paidMethod  String?  // cash, card, transfer
+  notes       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  studentId     String?
+  student       Student?       @relation(fields: [studentId], references: [id])
+  teacherId     String?
+  teacher       Teacher?       @relation(fields: [teacherId], references: [id])
+  borrowRecordId String?
+  borrowRecord  BorrowRecord?  @relation(fields: [borrowRecordId], references: [id])
+
+  processedBy   String?   // Librarian who processed
+  waivedBy      String?   // Admin who waived
+}
+
+// ============================================================
+// 6. DANH GIA & PHAN HOI
+// ============================================================
+
+model Review {
+  id        String   @id @default(cuid())
+  rating    Int      // 1-5 stars
+  comment   String?
+  status    String   @default("active") // active, hidden, deleted
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  bookId    String
+  book      Book     @relation(fields: [bookId], references: [id])
+
+  @@unique([userId, bookId]) // Moi user chi review 1 lan/sach
+}
+
+model BookTag {
+  id        String   @id @default(cuid())
+  tag       String   // The tag: "giao khoa", "tham khao", "tieu thuyet"
+  createdAt DateTime @default(now())
+
+  bookId    String
+  book      Book     @relation(fields: [bookId], references: [id])
+
+  @@unique([bookId, tag])
+}
+
+// ============================================================
+// 7. THE THU VIEN
+// ============================================================
+
+model MembershipCard {
+  id            String   @id @default(cuid())
+  cardNumber    String   @unique // So the: TH-2024-000001
+  issueDate     DateTime @default(now())
+  expiryDate    DateTime // Ngay het han
+  status        String   @default("active") // active, expired, suspended, lost
+  maxBorrow     Int      @default(5) // So sach muon toi da
+  borrowDays    Int      @default(14) // So ngay muon toi da
+  notes         String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  studentId     String?   @unique
+  student       Student?  @relation(fields: [studentId], references: [id])
+  teacherId     String?   @unique
+  teacher       Teacher?  @relation(fields: [teacherId], references: [id])
+}
+
+// ============================================================
+// 8. THONG KE & BAO CAO
+// ============================================================
+
+model BorrowingStats {
+  id            String   @id @default(cuid())
+  date          DateTime @unique // Ngay thong ke
+  totalBorrows  Int      @default(0)
+  totalReturns  Int      @default(0)
+  totalOverdue  Int      @default(0)
+  totalReserves Int      @default(0)
+  activeBorrows Int      @default(0)
+  createdAt     DateTime @default(now())
+
+  // Phan theo loai nguoi doc
+  studentBorrows Int     @default(0)
+  teacherBorrows Int     @default(0)
+}
+
+model BookStats {
+  id            String   @id @default(cuid())
+  bookId        String
+  date          DateTime @default(now())
+  viewCount     Int      @default(0)
+  borrowCount   Int      @default(0)
+  reserveCount  Int      @default(0)
+  createdAt     DateTime @default(now())
+
+  book          Book     @relation(fields: [bookId], references: [id])
+
+  @@unique([bookId, date])
+}
+
+// ============================================================
+// 9. QUAN LY PHIEN & DANG NHAP
+// ============================================================
+
+model Session {
+  id            String   @id @default(cuid())
+  token         String   @unique
+  ipAddress     String?
+  userAgent     String?
+  expiresAt     DateTime
+  createdAt     DateTime @default(now())
+
+  userId        String
+  user          User     @relation(fields: [userId], references: [id])
+}
+
+// ============================================================
+// 10. THONG BAO
+// ============================================================
+
+model Notification {
+  id        String   @id @default(cuid())
+  title     String
+  message   String
+  type      String   @default("info") // info, warning, success, error
+  category  String?  // borrow, return, fine, system
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+}
+
+// ============================================================
+// 11. AUDIT LOG - LICH SU HANH DONG
+// ============================================================
+
+model AuditLog {
+  id          String   @id @default(cuid())
+  action      String   // create, update, delete, borrow, return, etc.
+  entity      String   // Book, BorrowRecord, User, etc.
+  entityId    String
+  oldValues   String?  // JSON cua gia tri cu
+  newValues   String?  // JSON cua gia tri moi
+  ipAddress   String?
+  userAgent   String?
+  createdAt   DateTime @default(now())
+
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+}
+
+// ============================================================
+// 12. CAU HINH HE THONG
+// ============================================================
+
+model SystemConfig {
+  id          String   @id @default(cuid())
+  key         String   @unique
+  value       String
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Cac key cau hinh:
+  // - max_borrow_student: So sach muon toi da cua hoc sinh
+  // - max_borrow_teacher: So sach muon toi da cua giao vien
+  // - max_borrow_days_student: So ngay muon toi da cua hoc sinh
+  // - max_borrow_days_teacher: So ngay muon toi da cua giao vien
+  // - fine_per_day: Phi phat moi ngay
+  // - max_renewals: So lan gia han toi da
+  // - card_expiry_months: So thang het han the
+}
