@@ -3,14 +3,12 @@ node_modules/
 **/node_modules/
 
 # Build outputs
-dist/
+# dist/  (user requested to track frontend build output)
 dist-ssr/
 build/
 *.tsbuildinfo
 
 # Environment files (BACKEND - sensitive!)
-.env
-.env.*
 !.env.example
 *.local
 
@@ -26,14 +24,12 @@ pnpm-debug.log*
 *.sqlite
 *.sqlite3
 
-# Backend uploads (runtime data)
-uploads/
+# Backend uploads (user requested to track uploads/)
 
 # Prisma
 prisma/*.db
 
 # Editor directories and files
-.vscode/*
 !.vscode/extensions.json
 .idea
 *.suo
@@ -56,3 +52,4 @@ coverage/
 !.yarn/plugins
 !.yarn/releases
 !.yarn/versions
+config.bat

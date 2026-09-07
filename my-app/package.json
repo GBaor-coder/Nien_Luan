@@ -4,12 +4,12 @@
   "version": "0.0.0",
   "type": "module",
   "author": {
-    "name": "Hệ Thống Quản Lý Thư Viện Trường",
+    "name": "H\u1ec7 Th\u1ed1ng Qu\u1ea3n L\u00fd Th\u01b0 Vi\u1ec7n Tr\u01b0\u1eddng",
     "url": "https://thuvientruongdthu.lib"
   },
   "scripts": {
-    "dev": "vite",
-    "build": "tsc -b && vite build",
+    "dev": "node init && vite",
+    "build": "node init && tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview"
   },
